@@ -1,0 +1,28 @@
+{
+  "name": "aegis-ops",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "description": "Autonomous Enterprise Reliability & Security Nexus - Multi-agent platform for Splunk",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "dev:api": "npm run dev --workspace=@aegis/api",
+    "dev:web": "npm run dev --workspace=@aegis/web",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

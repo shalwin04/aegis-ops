@@ -1,0 +1,133 @@
+[
+  {
+    "time": 1717927200,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "payment-gateway",
+      "level": "ERROR",
+      "message": "Transaction timeout after 30s",
+      "latency_ms": 30250,
+      "status": 500,
+      "error_code": "TIMEOUT"
+    }
+  },
+  {
+    "time": 1717927260,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "payment-gateway",
+      "level": "ERROR",
+      "message": "Database connection pool exhausted",
+      "latency_ms": 15000,
+      "status": 503,
+      "error_code": "DB_POOL_EXHAUSTED"
+    }
+  },
+  {
+    "time": 1717927320,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "payment-gateway",
+      "level": "WARN",
+      "message": "High latency detected",
+      "latency_ms": 5200,
+      "status": 200
+    }
+  },
+  {
+    "time": 1717927380,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "user-auth",
+      "level": "WARN",
+      "message": "Failed login attempt",
+      "latency_ms": 120,
+      "status": 401,
+      "src_ip": "185.220.101.42",
+      "user": "admin",
+      "error_code": "AUTH_FAILED"
+    }
+  },
+  {
+    "time": 1717927440,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "user-auth",
+      "level": "ERROR",
+      "message": "Rate limit exceeded - potential credential stuffing attack",
+      "src_ip": "185.220.101.42",
+      "user": "admin",
+      "blocked": true,
+      "attempt_count": 150
+    }
+  },
+  {
+    "time": 1717927500,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "inventory-api",
+      "level": "WARN",
+      "message": "Slow query detected",
+      "latency_ms": 2500,
+      "status": 200,
+      "endpoint": "/api/products/search"
+    }
+  },
+  {
+    "time": 1717927560,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "checkout",
+      "level": "ERROR",
+      "message": "Upstream payment service unavailable",
+      "latency_ms": 31000,
+      "status": 502,
+      "error_code": "UPSTREAM_DOWN"
+    }
+  },
+  {
+    "time": 1717927620,
+    "sourcetype": "app:security",
+    "index": "main",
+    "event": {
+      "service": "user-auth",
+      "level": "WARN",
+      "message": "Suspicious geographic pattern detected",
+      "src_ip": "103.75.201.44",
+      "country": "VN",
+      "threat_score": 0.75
+    }
+  },
+  {
+    "time": 1717927680,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "notifications",
+      "level": "ERROR",
+      "message": "SMTP connection failed",
+      "latency_ms": 5000,
+      "status": 500,
+      "error_code": "SMTP_ERROR"
+    }
+  },
+  {
+    "time": 1717927740,
+    "sourcetype": "app:logs",
+    "index": "main",
+    "event": {
+      "service": "search",
+      "level": "WARN",
+      "message": "Elasticsearch cluster status yellow",
+      "latency_ms": 1800,
+      "cluster_health": "yellow"
+    }
+  }
+]

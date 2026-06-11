@@ -1,0 +1,16 @@
+_time,service,level,message,latency_ms,status,src_ip,user,error_code
+2026-06-09T10:00:00Z,payment-gateway,ERROR,Transaction timeout after 30s,30250,500,192.168.1.100,,TIMEOUT
+2026-06-09T10:01:00Z,payment-gateway,ERROR,Database connection pool exhausted,15000,503,192.168.1.100,,DB_POOL_EXHAUSTED
+2026-06-09T10:02:00Z,payment-gateway,WARN,High latency detected,5200,200,192.168.1.101,,
+2026-06-09T10:03:00Z,payment-gateway,ERROR,Card validation failed,250,400,192.168.1.102,,CARD_INVALID
+2026-06-09T10:04:00Z,checkout,ERROR,Upstream payment service unavailable,31000,502,192.168.1.103,,UPSTREAM_DOWN
+2026-06-09T10:05:00Z,user-auth,WARN,Failed login attempt,120,401,185.220.101.42,admin,AUTH_FAILED
+2026-06-09T10:05:30Z,user-auth,WARN,Failed login attempt,95,401,185.220.101.42,admin,AUTH_FAILED
+2026-06-09T10:06:00Z,user-auth,WARN,Failed login attempt,88,401,45.155.205.89,root,AUTH_FAILED
+2026-06-09T10:06:30Z,user-auth,ERROR,Rate limit exceeded,50,429,185.220.101.42,admin,RATE_LIMITED
+2026-06-09T10:07:00Z,user-auth,WARN,Suspicious geographic pattern,75,200,103.75.201.44,guest,GEO_ANOMALY
+2026-06-09T10:08:00Z,inventory-api,WARN,Slow query detected,2500,200,192.168.1.104,,SLOW_QUERY
+2026-06-09T10:09:00Z,inventory-api,ERROR,Query timeout,30000,504,192.168.1.104,,QUERY_TIMEOUT
+2026-06-09T10:10:00Z,search,WARN,Elasticsearch cluster yellow,1800,200,,,ES_DEGRADED
+2026-06-09T10:11:00Z,notifications,WARN,Email delivery delayed,120,200,,,QUEUE_BACKLOG
+2026-06-09T10:12:00Z,notifications,ERROR,SMTP connection failed,5000,500,,,SMTP_ERROR
