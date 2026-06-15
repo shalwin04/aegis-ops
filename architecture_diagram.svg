@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" fill="none">
+  <defs>
+    <linearGradient id="splunkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#000000"/>
+      <stop offset="100%" style="stop-color:#333333"/>
+    </linearGradient>
+    <linearGradient id="agentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a1a"/>
+      <stop offset="100%" style="stop-color:#2d2d2d"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#fafafa"/>
+
+  <!-- Title -->
+  <text x="600" y="50" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#000">AegisOps Architecture</text>
+  <text x="600" y="80" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" fill="#666">Autonomous Multi-Agent Incident Response Platform</text>
+
+  <!-- Splunk MCP Server (Central) -->
+  <rect x="450" y="360" width="300" height="180" rx="16" fill="url(#splunkGrad)" filter="url(#shadow)"/>
+  <text x="600" y="410" text-anchor="middle" font-family="system-ui, sans-serif" font-size="18" font-weight="600" fill="#fff">Splunk MCP Server</text>
+  <text x="600" y="440" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#aaa">JSON-RPC 2.0</text>
+
+  <!-- Splunk Tools -->
+  <rect x="470" y="460" width="120" height="30" rx="6" fill="#333"/>
+  <text x="530" y="480" text-anchor="middle" font-family="monospace" font-size="10" fill="#0f0">splunk_run_query</text>
+
+  <rect x="610" y="460" width="120" height="30" rx="6" fill="#333"/>
+  <text x="670" y="480" text-anchor="middle" font-family="monospace" font-size="10" fill="#0f0">saia_generate_spl</text>
+
+  <rect x="540" y="500" width="120" height="30" rx="6" fill="#333"/>
+  <text x="600" y="520" text-anchor="middle" font-family="monospace" font-size="10" fill="#0f0">saia_explain_spl</text>
+
+  <!-- Incident Input -->
+  <rect x="500" y="120" width="200" height="70" rx="12" fill="#fff" stroke="#000" stroke-width="2" filter="url(#shadow)"/>
+  <text x="600" y="150" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#000">Incident Input</text>
+  <text x="600" y="172" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#666">Manual / Alert / Webhook</text>
+
+  <!-- Arrow from Input to Agents -->
+  <path d="M600 190 L600 230" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#000"/>
+    </marker>
+  </defs>
+
+  <!-- Parallel Agents Box -->
+  <rect x="150" y="240" width="900" height="100" rx="12" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="5,5"/>
+  <text x="170" y="262" font-family="system-ui, sans-serif" font-size="11" fill="#888">PARALLEL EXECUTION</text>
+
+  <!-- Healer Agent -->
+  <rect x="200" y="270" width="180" height="60" rx="10" fill="url(#agentGrad)" filter="url(#shadow)"/>
+  <text x="290" y="297" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#fff">Healer Agent</text>
+  <text x="290" y="315" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#aaa">Observability Analysis</text>
+
+  <!-- Sentinel Agent -->
+  <rect x="820" y="270" width="180" height="60" rx="10" fill="url(#agentGrad)" filter="url(#shadow)"/>
+  <text x="910" y="297" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#fff">Sentinel Agent</text>
+  <text x="910" y="315" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#aaa">Security Analysis</text>
+
+  <!-- Arrows from Input to Agents -->
+  <path d="M550 190 L290 260" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M650 190 L910 260" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Arrows from Agents to Splunk -->
+  <path d="M290 330 L500 400" stroke="#000" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead)"/>
+  <path d="M910 330 L700 400" stroke="#000" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead)"/>
+
+  <!-- Correlator -->
+  <rect x="510" y="580" width="180" height="60" rx="10" fill="url(#agentGrad)" filter="url(#shadow)"/>
+  <text x="600" y="607" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#fff">Correlator</text>
+  <text x="600" y="625" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#aaa">Merges Findings</text>
+
+  <!-- Arrow from Splunk to Correlator -->
+  <path d="M600 540 L600 575" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Architect Agent -->
+  <rect x="510" y="670" width="180" height="60" rx="10" fill="url(#agentGrad)" filter="url(#shadow)"/>
+  <text x="600" y="697" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#fff">Architect Agent</text>
+  <text x="600" y="715" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#aaa">Remediation + Code Fix</text>
+
+  <!-- Arrow from Correlator to Architect -->
+  <path d="M600 640 L600 665" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Claude AI -->
+  <rect x="760" y="670" width="150" height="60" rx="10" fill="#fff" stroke="#000" stroke-width="2" filter="url(#shadow)"/>
+  <text x="835" y="697" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" font-weight="600" fill="#000">Claude AI</text>
+  <text x="835" y="715" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" fill="#666">Code Generation</text>
+
+  <!-- Arrow from Architect to Claude -->
+  <path d="M690 700 L755 700" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Auto-Execute Box -->
+  <rect x="150" y="760" width="900" height="100" rx="12" fill="none" stroke="#000" stroke-width="2"/>
+  <text x="170" y="782" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#000">AUTO-EXECUTE</text>
+
+  <!-- Execution Actions -->
+  <rect x="180" y="800" width="100" height="45" rx="8" fill="#f5f5f5" stroke="#ddd"/>
+  <text x="230" y="827" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#000">WAF Rules</text>
+
+  <rect x="300" y="800" width="100" height="45" rx="8" fill="#f5f5f5" stroke="#ddd"/>
+  <text x="350" y="827" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#000">Splunk Alerts</text>
+
+  <rect x="420" y="800" width="120" height="45" rx="8" fill="#f5f5f5" stroke="#ddd"/>
+  <text x="480" y="827" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#000">Edge Processor</text>
+
+  <rect x="560" y="800" width="100" height="45" rx="8" fill="#f5f5f5" stroke="#ddd"/>
+  <text x="610" y="827" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#000">Notifications</text>
+
+  <!-- GitHub PR (highlighted) -->
+  <rect x="680" y="800" width="130" height="45" rx="8" fill="#000" filter="url(#shadow)"/>
+  <text x="745" y="820" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" font-weight="600" fill="#fff">GitHub PR</text>
+  <text x="745" y="835" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#aaa">Human Review</text>
+
+  <!-- Memory Loop -->
+  <rect x="830" y="800" width="100" height="45" rx="8" fill="#f5f5f5" stroke="#ddd"/>
+  <text x="880" y="820" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#000">Memory</text>
+  <text x="880" y="835" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" fill="#666">Learning Loop</text>
+
+  <!-- Arrow from Architect to Actions -->
+  <path d="M600 730 L600 755" stroke="#000" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Memory Loop Arrow -->
+  <path d="M950 450 Q1050 450 1050 600 Q1050 850 900 850" stroke="#666" stroke-width="1.5" stroke-dasharray="4,2" marker-end="url(#arrowhead)" fill="none"/>
+  <text x="1060" y="600" font-family="system-ui, sans-serif" font-size="10" fill="#888" transform="rotate(90 1060 600)">Memory Loop</text>
+
+  <!-- Legend -->
+  <rect x="30" y="800" width="100" height="60" rx="8" fill="#fff" stroke="#ddd"/>
+  <text x="80" y="820" text-anchor="middle" font-family="system-ui, sans-serif" font-size="10" font-weight="600" fill="#000">Legend</text>
+  <line x1="40" y1="835" x2="70" y2="835" stroke="#000" stroke-width="2"/>
+  <text x="75" y="838" font-family="system-ui, sans-serif" font-size="9" fill="#666">Data flow</text>
+  <line x1="40" y1="850" x2="70" y2="850" stroke="#000" stroke-width="2" stroke-dasharray="4,2"/>
+  <text x="75" y="853" font-family="system-ui, sans-serif" font-size="9" fill="#666">MCP call</text>
+</svg>
