@@ -92,18 +92,18 @@ async function generateCodeFix(params: {
 }): Promise<{ fixedContent: string; description: string; rootCause: string } | null> {
   const { fileContent, filePath, errorType, errorPattern, incidentDescription, language } = params;
 
-  const prompt = `You are a senior software engineer fixing a production incident.
+  const prompt = `You are a senior software engineer fixing a production incident. Your job is to analyze the code and identify potential issues that could cause the described incident, then fix them.
 
 ## Incident Description
 ${incidentDescription}
 
-## Error Type
+## Incident Type
 ${errorType}
 
-## Error Pattern from Logs
+## Context from Logs and Analysis
 ${errorPattern}
 
-## File to Fix
+## File to Analyze and Fix
 Path: ${filePath}
 Language: ${language}
 
@@ -112,23 +112,29 @@ ${fileContent}
 \`\`\`
 
 ## Task
-1. Analyze the code and identify the root cause of the error
-2. Generate a minimal, focused fix
-3. Return ONLY the fixed code (the entire file with your fix applied)
+1. Analyze this code in the context of the incident
+2. Identify what in this code could cause or contribute to the incident (latency, errors, security issues, etc.)
+3. Generate a practical fix that addresses the issue
+
+## What to look for based on incident type:
+- **Latency/Timeout issues**: Missing timeouts, no connection pooling, blocking operations, inefficient queries, missing caching
+- **Error spikes**: Missing error handling, null checks, validation, try-catch blocks
+- **Security issues**: Missing input validation, SQL injection risks, XSS vulnerabilities, insecure configurations
+- **Connection issues**: Missing retry logic, circuit breakers, connection pool exhaustion
 
 ## Requirements
-- Make the smallest change necessary to fix the issue
-- Add proper error handling where needed
-- Do not change code style or formatting unnecessarily
-- Do not add comments explaining the fix (keep it clean)
+- Make a meaningful but minimal change to fix the issue
+- Add proper error handling, timeouts, or validation as needed
+- Focus on production-readiness and reliability
+- Do not change unrelated code
 - Return the COMPLETE fixed file content
 
 ## Response Format
 Respond with a JSON object (no markdown, just raw JSON):
 {
-  "rootCause": "Brief explanation of what caused the error",
-  "description": "One-line description of the fix (for PR title)",
-  "fixedContent": "The complete fixed file content"
+  "rootCause": "Brief explanation of what in this code could cause the incident",
+  "description": "One-line description of the fix (for PR title, e.g., 'Add connection timeout and retry logic')",
+  "fixedContent": "The complete fixed file content with your changes applied"
 }`;
 
   try {
@@ -155,6 +161,249 @@ Respond with a JSON object (no markdown, just raw JSON):
     console.error("[Architect] Failed to generate code fix:", error);
     return null;
   }
+}
+
+/**
+ * Generate a sample code fix for demo purposes when GitHub is not connected
+ */
+function generateSampleCodeFix(
+  errorType: string,
+  serviceName: string,
+  description: string
+): {
+  file: string;
+  language: string;
+  diff: string;
+  originalContent: string;
+  fixedContent: string;
+  description: string;
+  rootCause: string;
+} | null {
+  const serviceClass = serviceName
+    .split("-")
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join("");
+
+  const errorLower = errorType.toLowerCase();
+
+  if (errorLower.includes("null") || errorLower.includes("undefined")) {
+    const file = `src/services/${serviceName}/handler.ts`;
+    const originalContent = `export async function processRequest(request: Request): Promise<Response> {
+  const user = await getUser(request.userId);
+  const result = user.account.process(request.data);
+  return { success: true, data: result };
+}`;
+    const fixedContent = `export async function processRequest(request: Request): Promise<Response> {
+  const user = await getUser(request.userId);
+  if (!user?.account) {
+    throw new Error(\`User account not found for userId: \${request.userId}\`);
+  }
+  const result = user.account.process(request.data);
+  return { success: true, data: result };
+}`;
+    return {
+      file,
+      language: "typescript",
+      diff: `--- a/${file}
++++ b/${file}
+@@ -1,5 +1,8 @@
+ export async function processRequest(request: Request): Promise<Response> {
+   const user = await getUser(request.userId);
++  if (!user?.account) {
++    throw new Error(\`User account not found for userId: \${request.userId}\`);
++  }
+   const result = user.account.process(request.data);
+   return { success: true, data: result };
+ }`,
+      originalContent,
+      fixedContent,
+      description: "Add null safety check for user account",
+      rootCause: "Missing null check before accessing user.account property",
+    };
+  }
+
+  if (errorLower.includes("pool") || errorLower.includes("connection") || errorLower.includes("timeout")) {
+    const file = `src/services/${serviceName}/database.ts`;
+    const originalContent = `import { Pool } from 'pg';
+
+const pool = new Pool({
+  max: 10,
+  connectionTimeoutMillis: 30000,
+});
+
+export async function query(sql: string, params?: any[]) {
+  const client = await pool.connect();
+  const result = await client.query(sql, params);
+  client.release();
+  return result;
+}`;
+    const fixedContent = `import { Pool } from 'pg';
+
+const pool = new Pool({
+  max: 50,  // Increased from 10 to handle load
+  connectionTimeoutMillis: 5000,  // Fail fast instead of hanging
+  idleTimeoutMillis: 30000,
+  allowExitOnIdle: true,
+});
+
+export async function query(sql: string, params?: any[]) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(sql, params);
+    return result;
+  } catch (error) {
+    console.error('Database query failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}`;
+    return {
+      file,
+      language: "typescript",
+      diff: `--- a/${file}
++++ b/${file}
+@@ -2,15 +2,23 @@ import { Pool } from 'pg';
+
+ const pool = new Pool({
+-  max: 10,
+-  connectionTimeoutMillis: 30000,
++  max: 50,  // Increased from 10 to handle load
++  connectionTimeoutMillis: 5000,  // Fail fast instead of hanging
++  idleTimeoutMillis: 30000,
++  allowExitOnIdle: true,
+ });
+
+ export async function query(sql: string, params?: any[]) {
+   const client = await pool.connect();
+-  const result = await client.query(sql, params);
+-  client.release();
+-  return result;
++  try {
++    const result = await client.query(sql, params);
++    return result;
++  } catch (error) {
++    console.error('Database query failed:', error);
++    throw error;
++  } finally {
++    client.release();
++  }
+ }`,
+      originalContent,
+      fixedContent,
+      description: "Fix connection pool exhaustion with proper resource management",
+      rootCause: "Connection pool size too small (10) and missing try/finally for client release",
+    };
+  }
+
+  if (errorLower.includes("circuit") || errorLower.includes("retry")) {
+    const file = `src/services/${serviceName}/client.ts`;
+    const originalContent = `export async function callExternalService(request: any) {
+  const response = await fetch(EXTERNAL_API_URL, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+  return response.json();
+}`;
+    const fixedContent = `import CircuitBreaker from 'opossum';
+
+const breaker = new CircuitBreaker(callExternalServiceInternal, {
+  timeout: 5000,
+  errorThresholdPercentage: 50,
+  resetTimeout: 30000,
+});
+
+async function callExternalServiceInternal(request: any) {
+  const response = await fetch(EXTERNAL_API_URL, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) {
+    throw new Error(\`Service returned \${response.status}\`);
+  }
+  return response.json();
+}
+
+export async function callExternalService(request: any) {
+  return breaker.fire(request);
+}`;
+    return {
+      file,
+      language: "typescript",
+      diff: `--- a/${file}
++++ b/${file}
+@@ -1,7 +1,24 @@
++import CircuitBreaker from 'opossum';
++
++const breaker = new CircuitBreaker(callExternalServiceInternal, {
++  timeout: 5000,
++  errorThresholdPercentage: 50,
++  resetTimeout: 30000,
++});
++
++async function callExternalServiceInternal(request: any) {
++  const response = await fetch(EXTERNAL_API_URL, {
++    method: 'POST',
++    body: JSON.stringify(request),
++  });
++  if (!response.ok) {
++    throw new Error(\`Service returned \${response.status}\`);
++  }
++  return response.json();
++}
++
+ export async function callExternalService(request: any) {
+-  const response = await fetch(EXTERNAL_API_URL, {
+-    method: 'POST',
+-    body: JSON.stringify(request),
+-  });
+-  return response.json();
++  return breaker.fire(request);
+ }`,
+      originalContent,
+      fixedContent,
+      description: "Add circuit breaker pattern to prevent cascade failures",
+      rootCause: "Missing circuit breaker causing cascade failures when external service is slow",
+    };
+  }
+
+  // Default fix for general errors
+  const file = `src/services/${serviceName}/index.ts`;
+  const originalContent = `export async function handleRequest(req: Request) {
+  const data = await processData(req.body);
+  return data;
+}`;
+  const fixedContent = `export async function handleRequest(req: Request) {
+  try {
+    const data = await processData(req.body);
+    return data;
+  } catch (error) {
+    console.error(\`[${serviceClass}] Error processing request:\`, error);
+    throw new ServiceError('Processing failed', { cause: error });
+  }
+}`;
+  return {
+    file,
+    language: "typescript",
+    diff: `--- a/${file}
++++ b/${file}
+@@ -1,4 +1,10 @@
+ export async function handleRequest(req: Request) {
+-  const data = await processData(req.body);
+-  return data;
++  try {
++    const data = await processData(req.body);
++    return data;
++  } catch (error) {
++    console.error(\`[${serviceClass}] Error processing request:\`, error);
++    throw new ServiceError('Processing failed', { cause: error });
++  }
+ }`,
+    originalContent,
+    fixedContent,
+    description: "Add proper error handling and logging",
+    rootCause: "Missing error handling causing unhandled exceptions",
+  };
 }
 
 /**
@@ -359,90 +608,182 @@ route_data(
       });
     }
 
-    // Check for code-level issues and generate fixes
+    // Check for code-level issues
     const codeIssue = detectCodeIssue(healerFindings, sentinelFindings, trigger.description);
 
-    if (codeIssue.isCodeIssue) {
+    // Check if GitHub is connected
+    const githubConnection = db.getGitHubConnection(state.userId);
+
+    // ALWAYS try to analyze code and create PR if GitHub is connected and there's a mapping
+    // Don't require codeIssue.isCodeIssue - any incident can have a code fix
+    if (githubConnection) {
       emitter?.({
         type: "agent:thinking",
         incidentId: state.incidentId,
         agent: "architect",
-        thought: `Detected code-level issue: ${codeIssue.errorType}. Checking for GitHub integration...`,
+        thought: "GitHub connected. Searching for repository mappings to analyze code...",
         timestamp: new Date().toISOString(),
       });
 
-      // Check if GitHub is connected and we have a mapping for this service
-      const githubConnection = db.getGitHubConnection(state.userId);
+      // Try to find a mapping for any of the affected services
+      for (const service of trigger.affectedServices) {
+        const mapping = db.getServiceRepoMapping(state.userId, service);
 
-      if (githubConnection) {
-        // Try to find a mapping for any of the affected services
-        for (const service of trigger.affectedServices) {
-          const mapping = db.getServiceRepoMapping(state.userId, service);
+        if (mapping) {
+          emitter?.({
+            type: "agent:thinking",
+            incidentId: state.incidentId,
+            agent: "architect",
+            thought: `Found repository mapping: ${service} → ${mapping.repoOwner}/${mapping.repoName}. Exploring repository structure...`,
+            timestamp: new Date().toISOString(),
+          });
 
-          if (mapping) {
+          try {
+            const token = decrypt(
+              githubConnection.tokenEncrypted,
+              githubConnection.tokenIv,
+              githubConnection.tokenTag
+            );
+            const github = new GitHubService(token);
+
+            // Get all source files in the repository
             emitter?.({
-              type: "agent:thinking",
+              type: "agent:tool_call",
               incidentId: state.incidentId,
               agent: "architect",
-              thought: `Found repository mapping: ${mapping.repoOwner}/${mapping.repoName}. Analyzing code...`,
+              tool: "github_explore_repo",
+              params: { repo: `${mapping.repoOwner}/${mapping.repoName}` },
               timestamp: new Date().toISOString(),
             });
 
-            try {
-              const token = decrypt(
-                githubConnection.tokenEncrypted,
-                githubConnection.tokenIv,
-                githubConnection.tokenTag
+            const sourceFiles = await github.findSourceFiles(
+              mapping.repoOwner,
+              mapping.repoName
+            );
+
+            emitter?.({
+              type: "agent:tool_result",
+              incidentId: state.incidentId,
+              agent: "architect",
+              tool: "github_explore_repo",
+              result: { filesFound: sourceFiles.length, files: sourceFiles.slice(0, 10).map(f => f.path) },
+              success: true,
+              timestamp: new Date().toISOString(),
+            });
+
+            if (sourceFiles.length === 0) {
+              emitter?.({
+                type: "agent:thinking",
+                incidentId: state.incidentId,
+                agent: "architect",
+                thought: "No source files found in repository. Skipping code analysis.",
+                timestamp: new Date().toISOString(),
+              });
+              break;
+            }
+
+            // Determine error type from incident
+            const errorType = codeIssue.isCodeIssue
+              ? codeIssue.errorType
+              : correlationVerdict?.incidentType === "security"
+                ? "security vulnerability"
+                : "latency timeout error";
+
+            // Find the most relevant file to fix
+            const targetFile = github.findRelevantFile(sourceFiles, errorType, service);
+
+            if (targetFile) {
+              emitter?.({
+                type: "agent:thinking",
+                incidentId: state.incidentId,
+                agent: "architect",
+                thought: `Identified target file for analysis: ${targetFile}`,
+                timestamp: new Date().toISOString(),
+              });
+
+              emitter?.({
+                type: "agent:tool_call",
+                incidentId: state.incidentId,
+                agent: "architect",
+                tool: "github_get_file",
+                params: { file: targetFile },
+                timestamp: new Date().toISOString(),
+              });
+
+              const fileContent = await github.getFileContent(
+                mapping.repoOwner,
+                mapping.repoName,
+                targetFile
               );
-              const github = new GitHubService(token);
 
-              // Try to find the relevant file
-              let targetFile = codeIssue.suggestedFile;
+              emitter?.({
+                type: "agent:tool_result",
+                incidentId: state.incidentId,
+                agent: "architect",
+                tool: "github_get_file",
+                result: { path: targetFile, size: fileContent.content.length },
+                success: true,
+                timestamp: new Date().toISOString(),
+              });
 
-              if (!targetFile) {
-                // Search for files related to the service
-                emitter?.({
-                  type: "agent:tool_call",
-                  incidentId: state.incidentId,
-                  agent: "architect",
-                  tool: "github_search",
-                  params: { query: service, repo: `${mapping.repoOwner}/${mapping.repoName}` },
-                  timestamp: new Date().toISOString(),
-                });
+              emitter?.({
+                type: "agent:thinking",
+                incidentId: state.incidentId,
+                agent: "architect",
+                thought: `Analyzing code and generating fix for ${correlationVerdict?.incidentType} incident...`,
+                timestamp: new Date().toISOString(),
+              });
 
-                const searchResults = await github.searchFiles(
-                  mapping.repoOwner,
-                  mapping.repoName,
-                  service
-                );
+              const language = getLanguage(targetFile);
 
-                if (searchResults.length > 0) {
-                  targetFile = searchResults[0].path;
-                }
-              }
+              // Build a rich error pattern from all findings
+              const errorPattern = [
+                trigger.description,
+                healerFindings?.rootCause || "",
+                healerFindings?.anomalySignature || "",
+                sentinelFindings?.attackVector ? `Attack vector: ${sentinelFindings.attackVector}` : "",
+                correlationVerdict?.summary || "",
+              ].filter(Boolean).join(". ").slice(0, 500);
 
-              if (targetFile) {
-                emitter?.({
-                  type: "agent:tool_call",
-                  incidentId: state.incidentId,
-                  agent: "architect",
-                  tool: "github_get_file",
-                  params: { file: targetFile },
-                  timestamp: new Date().toISOString(),
-                });
+              const fix = await generateCodeFix({
+                fileContent: fileContent.content,
+                filePath: targetFile,
+                errorType,
+                errorPattern,
+                incidentDescription: trigger.description,
+                language,
+              });
 
-                const fileContent = await github.getFileContent(
-                  mapping.repoOwner,
-                  mapping.repoName,
-                  targetFile
-                );
+              if (fix && fix.fixedContent !== fileContent.content) {
+                const diff = generateDiff(fileContent.content, fix.fixedContent, targetFile);
+
+                const codePatchAction: CodePatchAction = {
+                  type: "code_patch",
+                  file: targetFile,
+                  language,
+                  diff,
+                  originalContent: fileContent.content,
+                  fixedContent: fix.fixedContent,
+                  description: fix.description,
+                  rootCause: fix.rootCause,
+                  repository: `${mapping.repoOwner}/${mapping.repoName}`,
+                  serviceName: service,
+                  createPR: true,
+                };
+
+                actions.push(codePatchAction);
 
                 emitter?.({
                   type: "agent:tool_result",
                   incidentId: state.incidentId,
                   agent: "architect",
-                  tool: "github_get_file",
-                  result: { path: targetFile, size: fileContent.content.length },
+                  tool: "code_fix_generation",
+                  result: {
+                    file: targetFile,
+                    description: fix.description,
+                    rootCause: fix.rootCause,
+                    willCreatePR: true
+                  },
                   success: true,
                   timestamp: new Date().toISOString(),
                 });
@@ -451,58 +792,75 @@ route_data(
                   type: "agent:thinking",
                   incidentId: state.incidentId,
                   agent: "architect",
-                  thought: "Generating code fix using AI...",
+                  thought: `✅ Code fix generated! PR will be created on approval: ${fix.description}`,
                   timestamp: new Date().toISOString(),
                 });
-
-                const language = getLanguage(targetFile);
-                const fix = await generateCodeFix({
-                  fileContent: fileContent.content,
-                  filePath: targetFile,
-                  errorType: codeIssue.errorType,
-                  errorPattern: codeIssue.errorPattern,
-                  incidentDescription: trigger.description,
-                  language,
+              } else {
+                emitter?.({
+                  type: "agent:thinking",
+                  incidentId: state.incidentId,
+                  agent: "architect",
+                  thought: "Code analysis complete - no changes needed for this file.",
+                  timestamp: new Date().toISOString(),
                 });
-
-                if (fix && fix.fixedContent !== fileContent.content) {
-                  const diff = generateDiff(fileContent.content, fix.fixedContent, targetFile);
-
-                  const codePatchAction: CodePatchAction = {
-                    type: "code_patch",
-                    file: targetFile,
-                    language,
-                    diff,
-                    originalContent: fileContent.content,
-                    fixedContent: fix.fixedContent,
-                    description: fix.description,
-                    rootCause: fix.rootCause,
-                    repository: `${mapping.repoOwner}/${mapping.repoName}`,
-                    serviceName: service,
-                    createPR: true,
-                  };
-
-                  actions.push(codePatchAction);
-
-                  emitter?.({
-                    type: "agent:tool_result",
-                    incidentId: state.incidentId,
-                    agent: "architect",
-                    tool: "code_fix_generation",
-                    result: { file: targetFile, description: fix.description },
-                    success: true,
-                    timestamp: new Date().toISOString(),
-                  });
-                }
               }
-            } catch (error) {
-              console.error("[Architect] GitHub code fix failed:", error);
-              // Continue without code fix - other actions will still be added
             }
-
-            break; // Only try the first matching service
+          } catch (error) {
+            console.error("[Architect] GitHub code fix failed:", error);
+            emitter?.({
+              type: "agent:thinking",
+              incidentId: state.incidentId,
+              agent: "architect",
+              thought: `GitHub analysis failed: ${error instanceof Error ? error.message : "Unknown error"}. Continuing with other remediation actions.`,
+              timestamp: new Date().toISOString(),
+            });
           }
+
+          break; // Only try the first matching service
         }
+      }
+    } else if (codeIssue.isCodeIssue) {
+      // GitHub not connected but code issue detected - generate sample fix for demo
+      emitter?.({
+        type: "agent:thinking",
+        incidentId: state.incidentId,
+        agent: "architect",
+        thought: "Generating code fix suggestion (connect GitHub to create actual PR)...",
+        timestamp: new Date().toISOString(),
+      });
+
+      const sampleFix = generateSampleCodeFix(
+        codeIssue.errorType,
+        trigger.affectedServices[0],
+        trigger.description
+      );
+
+      if (sampleFix) {
+        const codePatchAction: CodePatchAction = {
+          type: "code_patch",
+          file: sampleFix.file,
+          language: sampleFix.language,
+          diff: sampleFix.diff,
+          originalContent: sampleFix.originalContent,
+          fixedContent: sampleFix.fixedContent,
+          description: sampleFix.description,
+          rootCause: sampleFix.rootCause,
+          repository: "your-org/your-repo",
+          serviceName: trigger.affectedServices[0],
+          createPR: true,
+        };
+
+        actions.push(codePatchAction);
+
+        emitter?.({
+          type: "agent:tool_result",
+          incidentId: state.incidentId,
+          agent: "architect",
+          tool: "code_fix_generation",
+          result: { file: sampleFix.file, description: sampleFix.description },
+          success: true,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 

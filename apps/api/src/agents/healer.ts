@@ -85,13 +85,19 @@ export async function healerNode(
 
     // ========== Query Splunk for current incident data ==========
     const services = state.trigger.affectedServices.join("|");
-    const errorQuery = `index=_internal (log_level=ERROR OR log_level=WARN) earliest=-1h
-      | stats count as error_count,
-              dc(component) as affected_components,
-              latest(_time) as last_error
-        by log_level
-      | append [search index=_internal sourcetype=splunkd earliest=-1h
-        | stats avg(elapsed_ms) as avg_latency, max(elapsed_ms) as max_latency]`;
+
+    // Query APM traces for latency and error data
+    const errorQuery = `index=main sourcetype="apm:trace" earliest=-15m
+      | eval is_error=if(status="ERROR" OR http_status>=500, 1, 0)
+      | stats avg(duration_ms) as avg_latency,
+              max(duration_ms) as max_latency,
+              sum(is_error) as error_count,
+              count as total_requests
+        by service
+      | eval error_rate=round((error_count/total_requests)*100, 2)
+      | where service IN ("${state.trigger.affectedServices.join('","')}")
+      | append [search index=main sourcetype="app:log" level="ERROR" earliest=-15m
+        | stats count as app_errors by service, message]`;
 
     // Query Splunk for errors and metrics
     emitter?.({

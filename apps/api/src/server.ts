@@ -13,6 +13,7 @@ import testDataRouter from "./routes/test-data.js";
 import { githubRouter } from "./routes/github.js";
 import { integrationsRouter } from "./routes/integrations.js";
 import { chatRouter } from "./routes/chat.js";
+import { anomalyRouter } from "./routes/anomaly.js";
 
 const app = express();
 const server = createServer(app);
@@ -71,6 +72,7 @@ app.use("/api/events", eventsRouter);
 app.use("/api/github", githubRouter);
 app.use("/api/integrations", integrationsRouter);
 app.use("/api/chat", chatRouter);
+app.use("/api/anomaly", anomalyRouter);
 app.use("/splunk", splunkConnectRouter);
 
 // Webhook routes (for Splunk alerts and PagerDuty)
@@ -128,6 +130,11 @@ server.listen(config.server.port, () => {
     GET  /api/chat/history           Get conversation history
     DELETE /api/chat/history         Clear conversation
     GET  /api/chat/suggestions       Get suggested prompts
+
+  Anomaly Detection (Auto-Monitoring):
+    GET  /api/anomaly/status         Check if monitoring is active
+    POST /api/anomaly/start          Start auto-monitoring Splunk
+    POST /api/anomaly/stop           Stop auto-monitoring
 
   Incidents:
     POST /api/incidents              Create incident

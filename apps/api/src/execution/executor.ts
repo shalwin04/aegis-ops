@@ -46,6 +46,8 @@ export async function executePlan(
 ): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
 
+  console.log(`[Executor] Starting execution of ${plan.actions.length} actions for ${plan.incidentId}`);
+
   // Store incident context for notification execution
   currentIncidentContext = {
     incidentId: plan.incidentId,
@@ -55,6 +57,7 @@ export async function executePlan(
   };
 
   for (const action of plan.actions) {
+    console.log(`[Executor] Executing action: ${action.type}`);
     onProgress?.(action.type, "running");
 
     try {

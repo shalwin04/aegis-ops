@@ -15,6 +15,7 @@ let globalInstance: MCPProvider | null = null;
 /**
  * Get MCP provider for a specific user
  * Uses the user's stored Splunk credentials if available
+ * Falls back to global config if user has no connection but global mode is live
  */
 export function getMCPProviderForUser(userId: string): MCPProvider {
   // Check cache first
@@ -27,7 +28,22 @@ export function getMCPProviderForUser(userId: string): MCPProvider {
   const connection = db.getSplunkConnection(userId);
 
   if (!connection) {
-    // No Splunk connection - use mock provider
+    // No user-specific connection - check if global live mode is configured
+    if (config.splunk.mode === "live" && config.splunk.mcpEndpoint && config.splunk.token) {
+      console.log(`[MCP] No user connection, using global live config for user ${userId}`);
+      const provider = new LiveSplunkMCP({
+        endpoint: config.splunk.mcpEndpoint,
+        token: config.splunk.token,
+        index: config.splunk.index,
+      });
+      userProviderCache.set(userId, {
+        provider,
+        expiresAt: Date.now() + CACHE_TTL,
+      });
+      return provider;
+    }
+
+    // Fall back to mock provider
     const provider = new MockSplunkMCP();
     userProviderCache.set(userId, {
       provider,

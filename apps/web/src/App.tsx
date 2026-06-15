@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ConnectSplunk from "./pages/ConnectSplunk";
@@ -47,8 +48,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <Routes>
+      {/* Landing page - redirect to dashboard if authenticated */}
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Landing />}
+      />
+
       {/* Public routes */}
       <Route
         path="/login"
@@ -85,7 +94,7 @@ function AppRoutes() {
         }
       />
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />

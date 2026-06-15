@@ -6,7 +6,7 @@ import { sentinelNode } from "../agents/sentinel.js";
 import { correlatorNode } from "../agents/correlator.js";
 import { architectNode } from "../agents/architect.js";
 import { incidentStore } from "../store/incidents.js";
-import { executePlan, shouldAutoApprove } from "../execution/executor.js";
+import { executePlan } from "../execution/executor.js";
 import { broadcastToIncident } from "../routes/events.js";
 import { getMCPProviderForUser } from "../mcp/index.js";
 import { db } from "../db/index.js";
@@ -33,6 +33,9 @@ export function clearEventEmitter(incidentId: string) {
  *
  * Flow:
  * START -> [healer, sentinel] (parallel) -> correlator -> architect -> END
+ *
+ * Human-in-the-loop: After analysis, the system waits for human approval
+ * before executing the plan and creating PRs.
  */
 function buildWorkflowGraph() {
   const graph = new StateGraph(AegisStateAnnotation)
@@ -62,6 +65,14 @@ const workflow = buildWorkflowGraph();
 
 /**
  * Run the AegisOps workflow for an incident
+ *
+ * AUTONOMOUS MODE: The workflow now automatically:
+ * 1. Analyzes the incident (Healer + Sentinel in parallel)
+ * 2. Correlates findings and determines severity
+ * 3. Generates remediation plan with code fixes
+ * 4. Executes ALL actions automatically
+ * 5. Creates PRs for code fixes (human approval on GitHub)
+ * 6. Saves to memory for future learning
  */
 export async function runWorkflow(
   incidentId: string,
@@ -98,57 +109,38 @@ export async function runWorkflow(
   });
 
   try {
-    // Run the workflow
+    // Run the workflow (analysis phase)
     const finalState = await workflow.invoke(initialState);
 
     // Convert to AegisState and store
     const aegisState = toAegisState(finalState);
     incidentStore.set(incidentId, aegisState);
 
-    // Emit plan ready event
+    // Emit plan ready event and WAIT for human approval
     if (aegisState.executionPlan) {
+      aegisState.status = "awaiting_approval";
+      incidentStore.set(incidentId, aegisState);
+
       emit({
         type: "plan:ready",
         incidentId,
         plan: aegisState.executionPlan,
         timestamp: new Date().toISOString(),
       });
-    }
 
-    // Check for auto-approval (low/medium severity)
-    if (shouldAutoApprove(aegisState.severity)) {
-      console.log(`[Workflow] Auto-approving ${incidentId} (severity: ${aegisState.severity})`);
+      console.log(`[Workflow] Plan ready for ${incidentId} - awaiting human approval`);
+      console.log(`[Workflow] Actions: ${aegisState.executionPlan.actions.map(a => a.type).join(", ")}`);
 
-      // Auto-approve and execute
-      aegisState.status = "executing";
-      aegisState.humanDecision = {
-        action: "approved",
-        decidedAt: new Date().toISOString(),
-        decidedBy: "auto-approval",
-      };
-      incidentStore.set(incidentId, aegisState);
-
-      emit({
-        type: "execution:started",
-        incidentId,
-        planId: aegisState.executionPlan?.id || "",
-        timestamp: new Date().toISOString(),
-      });
-
-      // Execute the plan
-      if (aegisState.executionPlan) {
-        await executeAndComplete(incidentId, aegisState, emit);
-      }
+      // Do NOT auto-execute - wait for user to call approveIncident()
     } else {
-      // Await human approval for high/critical
-      aegisState.status = "awaiting_approval";
+      // No plan generated, mark as resolved
+      aegisState.status = "resolved";
       incidentStore.set(incidentId, aegisState);
 
-      // Emit state update
       emit({
-        type: "state:update",
+        type: "incident:resolved",
         incidentId,
-        state: aegisState,
+        summary: "Analysis complete. No remediation actions required.",
         timestamp: new Date().toISOString(),
       });
     }
@@ -212,6 +204,14 @@ async function executeAndComplete(
   const actionsExecuted = results.filter((r) => r.success).map((r) => r.action.type);
   const errors = results.filter((r) => !r.success).map((r) => r.error || "Unknown error");
 
+  // Check if any PRs were created
+  const prResults = results.filter(
+    (r) => r.action.type === "code_patch" && r.success && r.result
+  );
+  const prsCreated = prResults
+    .map((r) => (r.result as { prUrl?: string }).prUrl)
+    .filter((url): url is string => typeof url === "string");
+
   // Update final state
   incidentStore.update(incidentId, (s) => ({
     ...s,
@@ -220,6 +220,7 @@ async function executeAndComplete(
       success,
       actionsExecuted,
       errors: errors.length > 0 ? errors : undefined,
+      prsCreated,
       completedAt: new Date().toISOString(),
     },
   }));
@@ -236,16 +237,28 @@ async function executeAndComplete(
     type: "execution:complete",
     incidentId,
     success,
-    results: { actionsExecuted, errors: errors.length > 0 ? errors : undefined },
+    results: {
+      actionsExecuted,
+      errors: errors.length > 0 ? errors : undefined,
+      prsCreated,
+    },
     timestamp: new Date().toISOString(),
   });
+
+  // Create summary message
+  let summary = success
+    ? `Incident resolved. ${actionsExecuted.length} actions executed successfully.`
+    : `Incident resolved with errors. ${actionsExecuted.length}/${results.length} actions succeeded.`;
+
+  if (prsCreated.length > 0) {
+    summary += ` ${prsCreated.length} PR(s) created - awaiting human approval on GitHub.`;
+  }
 
   emit({
     type: "incident:resolved",
     incidentId,
-    summary: success
-      ? `Incident resolved. ${actionsExecuted.length} actions executed successfully.`
-      : `Incident resolved with errors. ${actionsExecuted.length}/${results.length} actions succeeded.`,
+    summary,
+    prsCreated,
     timestamp: new Date().toISOString(),
   });
 }
@@ -304,14 +317,46 @@ async function saveAgentMemory(state: AegisStateWithUser, success: boolean): Pro
 }
 
 /**
- * Manually trigger execution (called after human approval)
+ * Execute plan after human approval
  */
-export async function executeApprovedPlan(incidentId: string): Promise<void> {
+export async function executeApprovedPlan(incidentId: string, approvedBy: string = "user"): Promise<void> {
   const state = incidentStore.get(incidentId);
   if (!state || !state.executionPlan) {
     throw new Error("No execution plan found for incident");
   }
 
+  if (state.status === "resolved") {
+    console.log(`[Workflow] Plan already resolved for ${incidentId}, ignoring`);
+    return; // Already done
+  }
+
+  // Allow both "awaiting_approval" (direct call) and "executing" (called from route that already set status)
+  if (state.status !== "awaiting_approval" && state.status !== "executing") {
+    throw new Error(`Cannot execute plan in status: ${state.status}`);
+  }
+
+  console.log(`[Workflow] Plan approved by ${approvedBy} for ${incidentId}`);
+
+  // Update state with approval (if not already set by route)
+  if (state.status === "awaiting_approval") {
+    state.status = "executing";
+    state.humanDecision = {
+      action: "approved",
+      decidedAt: new Date().toISOString(),
+      decidedBy: approvedBy,
+      reason: "Human approved",
+    };
+    incidentStore.set(incidentId, state);
+  }
+
   const emit: EventEmitter = (event) => broadcastToIncident(incidentId, event);
+
+  emit({
+    type: "execution:started",
+    incidentId,
+    planId: state.executionPlan.id,
+    timestamp: new Date().toISOString(),
+  });
+
   await executeAndComplete(incidentId, state, emit);
 }

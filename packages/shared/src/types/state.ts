@@ -116,6 +116,7 @@ export interface AegisState {
     success: boolean;
     actionsExecuted: string[];
     errors?: string[];
+    prsCreated?: string[];
     completedAt: string;
   };
 

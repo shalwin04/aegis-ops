@@ -9,6 +9,9 @@ import type {
 } from "@aegis/shared";
 import { escapeSPL, validateServiceName } from "../utils/splunk.js";
 
+// Skip SSL verification for Splunk Cloud (development only)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
 interface LiveMCPConfig {
   endpoint: string;
   token: string;

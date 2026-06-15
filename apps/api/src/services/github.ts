@@ -127,6 +127,111 @@ export class GitHubService {
   }
 
   /**
+   * Get repository tree (all files)
+   */
+  async getRepoTree(
+    owner: string,
+    repo: string,
+    branch?: string
+  ): Promise<Array<{ path: string; type: string; size?: number }>> {
+    const targetBranch = branch || (await this.getDefaultBranch(owner, repo));
+    const response = await this.request<{
+      tree: Array<{ path: string; type: string; size?: number }>;
+    }>("GET", `/repos/${owner}/${repo}/git/trees/${targetBranch}?recursive=1`);
+    return response.tree || [];
+  }
+
+  /**
+   * Find source code files in a repository (filters for common code extensions)
+   */
+  async findSourceFiles(
+    owner: string,
+    repo: string
+  ): Promise<Array<{ path: string; type: string; size?: number }>> {
+    const tree = await this.getRepoTree(owner, repo);
+    const codeExtensions = [
+      ".ts", ".tsx", ".js", ".jsx", ".py", ".java", ".go", ".rs", ".rb", ".php",
+      ".cs", ".cpp", ".c", ".swift", ".kt", ".scala"
+    ];
+
+    return tree.filter((file) => {
+      if (file.type !== "blob") return false;
+      const ext = file.path.substring(file.path.lastIndexOf("."));
+      return codeExtensions.includes(ext);
+    });
+  }
+
+  /**
+   * Find the most relevant file for a given incident type
+   * Prioritizes: handlers, controllers, services, routes, api, main entry points
+   */
+  findRelevantFile(
+    files: Array<{ path: string }>,
+    errorType: string,
+    serviceName: string
+  ): string | null {
+    const errorLower = errorType.toLowerCase();
+
+    // Priority patterns based on error type
+    const priorityPatterns: string[][] = [];
+
+    if (errorLower.includes("timeout") || errorLower.includes("connection") || errorLower.includes("pool")) {
+      priorityPatterns.push(
+        ["database", "db", "pool", "connection"],
+        ["client", "http", "fetch", "request"],
+        ["service", "handler"]
+      );
+    } else if (errorLower.includes("null") || errorLower.includes("undefined") || errorLower.includes("error")) {
+      priorityPatterns.push(
+        ["handler", "controller", "service"],
+        ["api", "route", "endpoint"],
+        ["index", "main", "app"]
+      );
+    } else if (errorLower.includes("auth") || errorLower.includes("security")) {
+      priorityPatterns.push(
+        ["auth", "security", "middleware"],
+        ["user", "session", "token"],
+        ["handler", "controller"]
+      );
+    } else {
+      // Default priority
+      priorityPatterns.push(
+        ["handler", "controller", "service"],
+        ["index", "main", "app", "server"]
+      );
+    }
+
+    // Search in priority order
+    for (const patterns of priorityPatterns) {
+      for (const file of files) {
+        const pathLower = file.path.toLowerCase();
+        // Skip test files, config, node_modules
+        if (pathLower.includes("test") || pathLower.includes("spec") ||
+            pathLower.includes("node_modules") || pathLower.includes("config") ||
+            pathLower.includes(".d.ts")) {
+          continue;
+        }
+        for (const pattern of patterns) {
+          if (pathLower.includes(pattern)) {
+            return file.path;
+          }
+        }
+      }
+    }
+
+    // Fallback: return first non-test source file in src/ directory
+    const srcFile = files.find((f) => {
+      const p = f.path.toLowerCase();
+      return p.startsWith("src/") &&
+             !p.includes("test") &&
+             !p.includes("spec") &&
+             !p.includes(".d.ts");
+    });
+
+    return srcFile?.path || files[0]?.path || null;
+  }
+
+  /**
    * Get the default branch of a repository
    */
   async getDefaultBranch(owner: string, repo: string): Promise<string> {

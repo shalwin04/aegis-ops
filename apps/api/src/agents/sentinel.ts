@@ -105,12 +105,20 @@ export async function sentinelNode(
       timestamp: new Date().toISOString(),
     });
 
-    // Query audit logs for authentication and security events
-    // Uses _audit index which has real data in Splunk Cloud
-    const auditQuery = `index=_audit action=* earliest=-1h
-      | stats count by action, info, user
-      | sort -count
-      | head 20`;
+    // Query security data: firewall blocks, auth failures, WAF events
+    const auditQuery = `index=main (sourcetype="firewall:traffic" OR sourcetype="auth:login" OR sourcetype="waf:blocked") earliest=-15m
+      | eval is_threat=if(action="blocked" OR success="false" OR threat_score>70, 1, 0)
+      | stats count as total_events,
+              sum(is_threat) as threat_events,
+              dc(src_ip) as unique_ips,
+              values(attack_signature) as attack_signatures,
+              values(geo_country) as countries
+        by sourcetype, action
+      | append [search index=main sourcetype="auth:login" success=false earliest=-15m
+        | stats count as failed_logins by src_ip, username
+        | where failed_logins > 5]
+      | append [search index=main sourcetype="waf:blocked" earliest=-15m
+        | stats count as blocks, values(rule_triggered) as rules by src_ip]`;
 
     emitter?.({
       type: "agent:tool_call",

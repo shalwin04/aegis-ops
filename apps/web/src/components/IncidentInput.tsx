@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Zap } from "lucide-react";
+import { ArrowRight, Zap, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { BorderBeam } from "./magicui/border-beam";
 
 interface IncidentInputProps {
   onSubmit: (data: { description: string; affectedServices: string[] }) => void;
@@ -16,6 +15,8 @@ const SERVICES = [
   "checkout",
   "notifications",
   "search",
+  "api-gateway",
+  "database",
 ];
 
 export function IncidentInput({ onSubmit, disabled }: IncidentInputProps) {
@@ -42,23 +43,36 @@ export function IncidentInput({ onSubmit, disabled }: IncidentInputProps) {
 
   const loadDemo = () => {
     setDescription(
-      "Sudden latency spike and error surge on payment API. Massive burst of identical malformed JSON payloads detected."
+      "Sudden latency spike and error surge on payment API. Massive burst of identical malformed JSON payloads detected from suspicious IPs."
     );
-    setSelectedServices(["payment-gateway", "user-auth"]);
+    setSelectedServices(["payment-gateway", "user-auth", "api-gateway"]);
   };
 
   return (
-    <div className="relative rounded-lg border border-border bg-card overflow-hidden">
-      {isFocused && <BorderBeam size={300} duration={10} />}
-
-      <form onSubmit={handleSubmit} className="p-4 sm:p-5">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={cn(
+        "glass-strong rounded-2xl overflow-hidden transition-all duration-300 h-full flex flex-col",
+        isFocused && "ring-2 ring-foreground/10"
+      )}
+    >
+      <form onSubmit={handleSubmit} className="p-4 flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <h2 className="text-xs sm:text-sm font-medium">New Incident</h2>
+        <div className="flex items-center justify-between mb-3 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-foreground/10 flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xs font-semibold">New Incident</h2>
+              <p className="text-[9px] text-muted-foreground">Report an issue</p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={loadDemo}
-            className="text-[10px] sm:text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
           >
             <Zap className="w-3 h-3" />
             Demo
@@ -66,7 +80,10 @@ export function IncidentInput({ onSubmit, disabled }: IncidentInputProps) {
         </div>
 
         {/* Description */}
-        <div className="mb-3 sm:mb-4">
+        <div className="mb-3 flex-1 min-h-0 flex flex-col">
+          <label className="text-[10px] font-medium text-muted-foreground mb-1 block flex-shrink-0">
+            Description
+          </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -74,37 +91,35 @@ export function IncidentInput({ onSubmit, disabled }: IncidentInputProps) {
             onBlur={() => setIsFocused(false)}
             placeholder="Describe the incident..."
             className={cn(
-              "w-full bg-transparent border border-border rounded-md px-3 py-2 text-xs sm:text-sm",
-              "placeholder:text-muted-foreground resize-none",
-              "focus:outline-none focus:border-foreground transition-colors"
+              "flex-1 min-h-[80px] w-full glass-subtle rounded-lg px-3 py-2 text-xs",
+              "placeholder:text-muted-foreground/60 resize-none",
+              "focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
             )}
-            rows={4}
             disabled={disabled}
           />
         </div>
 
         {/* Services */}
-        <div className="mb-4 sm:mb-5">
-          <label className="text-[10px] sm:text-xs text-muted-foreground mb-2 block">
+        <div className="mb-3 flex-shrink-0">
+          <label className="text-[10px] font-medium text-muted-foreground mb-1.5 block">
             Affected Services
           </label>
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+          <div className="flex flex-wrap gap-1">
             {SERVICES.map((service) => (
-              <motion.button
+              <button
                 key={service}
                 type="button"
                 onClick={() => toggleService(service)}
                 disabled={disabled}
-                whileTap={{ scale: 0.95 }}
                 className={cn(
-                  "px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-md text-[10px] sm:text-xs font-mono transition-all",
+                  "px-2 py-1 rounded-md text-[10px] font-medium transition-all",
                   selectedServices.includes(service)
                     ? "bg-foreground text-background"
-                    : "bg-muted text-muted-foreground hover:bg-accent"
+                    : "glass hover:bg-muted/80 text-muted-foreground"
                 )}
               >
-                {service}
-              </motion.button>
+                {service.split("-")[0]}
+              </button>
             ))}
           </div>
         </div>
@@ -114,18 +129,18 @@ export function IncidentInput({ onSubmit, disabled }: IncidentInputProps) {
           type="submit"
           disabled={disabled || !description.trim() || selectedServices.length === 0}
           className={cn(
-            "w-full flex items-center justify-center gap-2",
-            "px-4 sm:px-6 py-2.5 sm:py-3 rounded-md",
-            "text-xs sm:text-sm font-medium",
+            "w-full flex items-center justify-center gap-2 flex-shrink-0",
+            "px-4 py-2.5 rounded-lg",
+            "text-xs font-medium",
             "bg-foreground text-background",
-            "hover:bg-foreground/90 transition-colors",
+            "hover:bg-foreground/90 transition-all",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >
           Analyze
-          <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </form>
-    </div>
+    </motion.div>
   );
 }

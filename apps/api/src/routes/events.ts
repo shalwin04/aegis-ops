@@ -102,6 +102,19 @@ export function broadcastGlobal(event: ServerEvent): void {
 }
 
 /**
+ * Broadcast event to a specific user (currently broadcasts globally)
+ * In production, track connections per authenticated user
+ */
+export function broadcastToUser(userId: string, event: unknown): void {
+  // For now, broadcast to all global connections
+  // The frontend filters by userId if needed
+  const data = `data: ${JSON.stringify(event)}\n\n`;
+  for (const res of globalConnections) {
+    res.write(data);
+  }
+}
+
+/**
  * Get count of active connections
  */
 export function getConnectionStats(): { global: number; incidents: Record<string, number> } {

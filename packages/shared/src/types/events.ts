@@ -80,6 +80,7 @@ export interface ExecutionCompleteEvent {
   results: {
     actionsExecuted: string[];
     errors?: string[];
+    prsCreated?: string[];
   };
   timestamp: string;
 }
@@ -88,6 +89,7 @@ export interface IncidentResolvedEvent {
   type: "incident:resolved";
   incidentId: string;
   summary: string;
+  prsCreated?: string[];
   timestamp: string;
 }
 
@@ -116,6 +118,17 @@ export interface AuthFailedEvent {
   timestamp: string;
 }
 
+export interface AnomalyDetectedEvent {
+  type: "anomaly:detected";
+  incidentId: string;
+  anomalies: Array<{
+    type: "latency_spike" | "error_surge" | "security_threat" | "auth_attack";
+    severity: "low" | "medium" | "high" | "critical";
+    description: string;
+  }>;
+  timestamp: string;
+}
+
 export type ServerEvent =
   | AgentThinkingEvent
   | AgentToolCallEvent
@@ -130,7 +143,8 @@ export type ServerEvent =
   | ErrorEvent
   | StateUpdateEvent
   | AuthSuccessEvent
-  | AuthFailedEvent;
+  | AuthFailedEvent
+  | AnomalyDetectedEvent;
 
 // ============================================
 // Client → Server Events

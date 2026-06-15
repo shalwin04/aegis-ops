@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Activity, Shield, GitMerge, Wrench, Check } from "lucide-react";
+import { Activity, GitMerge, Wrench, Check, Zap, Circle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AegisState } from "@aegis/shared";
 
@@ -8,35 +8,76 @@ interface StatusBarProps {
 }
 
 const steps = [
-  { id: "healer", label: "Healer", shortLabel: "H", icon: Activity },
-  { id: "sentinel", label: "Sentinel", shortLabel: "S", icon: Shield },
-  { id: "correlator", label: "Correlator", shortLabel: "C", icon: GitMerge },
-  { id: "architect", label: "Architect", shortLabel: "A", icon: Wrench },
+  { id: "analyze", label: "Analyze", icon: Activity },
+  { id: "correlate", label: "Correlate", icon: GitMerge },
+  { id: "plan", label: "Plan", icon: Wrench },
+  { id: "execute", label: "Execute", icon: Zap },
 ];
 
 export function StatusBar({ incident }: StatusBarProps) {
   if (!incident) {
     return (
-      <div className="h-12 sm:h-16 flex items-center justify-center text-muted-foreground text-xs sm:text-sm">
-        Submit an incident to begin analysis
+      <div className="glass rounded-2xl p-4 flex items-center justify-center">
+        <div className="text-center">
+          <Circle className="w-4 h-4 mx-auto mb-2 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Submit an incident to begin analysis</p>
+        </div>
       </div>
     );
   }
 
-  const getStepStatus = (stepId: string) => {
+  const getStepStatus = (stepId: string): "pending" | "active" | "complete" => {
     switch (stepId) {
-      case "healer":
-        return incident.healerFindings ? "complete" : incident.status === "analyzing" ? "active" : "pending";
-      case "sentinel":
-        return incident.sentinelFindings ? "complete" : incident.status === "analyzing" ? "active" : "pending";
-      case "correlator":
-        return incident.correlationVerdict ? "complete" :
-          (incident.healerFindings && incident.sentinelFindings) ? "active" : "pending";
-      case "architect":
-        return incident.executionPlan ? "complete" :
-          incident.correlationVerdict ? "active" : "pending";
+      case "analyze":
+        if (incident.healerFindings && incident.sentinelFindings) return "complete";
+        if (incident.status === "analyzing") return "active";
+        return "pending";
+      case "correlate":
+        if (incident.correlationVerdict) return "complete";
+        if (incident.healerFindings && incident.sentinelFindings) return "active";
+        return "pending";
+      case "plan":
+        if (incident.executionPlan) return "complete";
+        if (incident.correlationVerdict) return "active";
+        return "pending";
+      case "execute":
+        if (incident.status === "resolved") return "complete";
+        if (incident.status === "executing" || incident.executionPlan) return "active";
+        return "pending";
       default:
         return "pending";
+    }
+  };
+
+  const getSeverityStyle = (severity: string) => {
+    switch (severity) {
+      case "critical":
+        return "bg-red-500 text-white";
+      case "high":
+        return "bg-orange-500 text-white";
+      case "medium":
+        return "bg-yellow-500 text-black";
+      case "low":
+        return "bg-foreground/20 text-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "analyzing":
+        return "Analyzing...";
+      case "awaiting_approval":
+        return "Awaiting Approval";
+      case "executing":
+        return "Executing...";
+      case "resolved":
+        return "Resolved";
+      case "rejected":
+        return "Rejected";
+      default:
+        return status;
     }
   };
 
@@ -44,64 +85,60 @@ export function StatusBar({ incident }: StatusBarProps) {
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="border border-border rounded-lg p-3 sm:p-4 bg-card"
+      className="glass-strong rounded-2xl p-4"
     >
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 sm:mb-4">
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <span className="text-[10px] sm:text-xs font-mono text-muted-foreground">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-mono glass px-2 py-1 rounded-lg">
             {incident.incidentId}
           </span>
           <span className={cn(
-            "text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full border",
-            incident.severity === "critical" && "border-foreground text-foreground",
-            incident.severity === "high" && "border-foreground/60 text-foreground/60",
-            incident.severity === "medium" && "border-muted-foreground text-muted-foreground",
-            incident.severity === "low" && "border-muted text-muted-foreground"
+            "text-[10px] px-2 py-1 rounded-lg font-semibold uppercase",
+            getSeverityStyle(incident.severity)
           )}>
             {incident.severity}
           </span>
         </div>
-        <span className="text-[10px] sm:text-xs text-muted-foreground">
-          {incident.status.replace("_", " ")}
-        </span>
+        <div className="flex items-center gap-2">
+          {incident.status === "analyzing" || incident.status === "executing" ? (
+            <div className="w-2 h-2 rounded-full bg-foreground animate-pulse" />
+          ) : incident.status === "resolved" ? (
+            <Check className="w-4 h-4 text-foreground" />
+          ) : null}
+          <span className="text-xs font-medium">{getStatusLabel(incident.status)}</span>
+        </div>
       </div>
 
       {/* Progress Steps */}
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex items-center gap-2">
         {steps.map((step, index) => {
           const status = getStepStatus(step.id);
           const Icon = step.icon;
 
           return (
-            <div key={step.id} className="flex items-center flex-1 min-w-0">
+            <div key={step.id} className="flex items-center flex-1">
               <motion.div
                 className={cn(
-                  "flex items-center justify-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-md flex-1 transition-colors min-w-0",
+                  "flex items-center justify-center gap-2 px-3 py-2 rounded-xl flex-1 transition-all",
                   status === "complete" && "bg-foreground text-background",
-                  status === "active" && "bg-accent border border-foreground",
-                  status === "pending" && "bg-muted text-muted-foreground"
+                  status === "active" && "glass border-2 border-foreground",
+                  status === "pending" && "bg-muted/50 text-muted-foreground"
                 )}
                 animate={status === "active" ? { opacity: [1, 0.7, 1] } : {}}
                 transition={{ repeat: Infinity, duration: 1.5 }}
               >
                 {status === "complete" ? (
-                  <Check className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <Check className="w-4 h-4" />
                 ) : (
-                  <Icon className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                  <Icon className="w-4 h-4" />
                 )}
-                {/* Full label on larger screens, short on mobile */}
-                <span className="text-[10px] sm:text-xs font-medium truncate hidden xs:inline sm:hidden">
-                  {step.shortLabel}
-                </span>
-                <span className="text-[10px] sm:text-xs font-medium truncate hidden sm:inline">
-                  {step.label}
-                </span>
+                <span className="text-xs font-medium hidden sm:inline">{step.label}</span>
               </motion.div>
 
               {index < steps.length - 1 && (
                 <div className={cn(
-                  "w-2 sm:w-4 h-px mx-0.5 sm:mx-1 flex-shrink-0",
+                  "w-4 h-0.5 mx-1",
                   status === "complete" ? "bg-foreground" : "bg-border"
                 )} />
               )}
@@ -109,6 +146,15 @@ export function StatusBar({ incident }: StatusBarProps) {
           );
         })}
       </div>
+
+      {/* Incident Description (collapsed) */}
+      {incident.trigger?.description && (
+        <div className="mt-4 pt-3 border-t border-border/50">
+          <p className="text-xs text-muted-foreground line-clamp-2">
+            {incident.trigger.description}
+          </p>
+        </div>
+      )}
     </motion.div>
   );
 }
