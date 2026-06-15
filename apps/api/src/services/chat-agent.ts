@@ -9,7 +9,7 @@
  * - Configure integrations
  */
 
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { config } from "../config.js";
 import { db } from "../db/index.js";
 import { getMCPProviderForUser } from "../mcp/index.js";
@@ -19,203 +19,233 @@ import { getSlackServiceForUser } from "./slack.js";
 import { calculateBlastRadius } from "../utils/blastRadius.js";
 import { queryMemoryForServices } from "../utils/memory.js";
 
-const anthropic = new Anthropic({
-  apiKey: config.anthropic.apiKey,
+const openai = new OpenAI({
+  apiKey: config.openai.apiKey,
 });
 
-// Tool definitions for the agent
-const TOOLS: Anthropic.Tool[] = [
+// Tool definitions for the agent (OpenAI format)
+const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: "query_splunk_logs",
-    description: "Query Splunk for logs, errors, metrics. Use this when user asks about logs, errors, performance, or metrics.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        query: {
-          type: "string",
-          description: "Natural language description of what to search for (e.g., 'errors in payment service last 24 hours')",
+    type: "function",
+    function: {
+      name: "query_splunk_logs",
+      description: "Query Splunk for logs, errors, metrics. Use this when user asks about logs, errors, performance, or metrics.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Natural language description of what to search for (e.g., 'errors in payment service last 24 hours')",
+          },
+          timeRange: {
+            type: "string",
+            description: "Time range like '-1h', '-24h', '-7d'. Default is '-1h'",
+          },
+          service: {
+            type: "string",
+            description: "Optional service name to filter by",
+          },
         },
-        timeRange: {
-          type: "string",
-          description: "Time range like '-1h', '-24h', '-7d'. Default is '-1h'",
-        },
-        service: {
-          type: "string",
-          description: "Optional service name to filter by",
-        },
-      },
-      required: ["query"],
-    },
-  },
-  {
-    name: "generate_report",
-    description: "Generate a summary report from Splunk data. Use when user asks for reports, summaries, or analysis.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        reportType: {
-          type: "string",
-          enum: ["error_summary", "latency_report", "security_audit", "service_health"],
-          description: "Type of report to generate",
-        },
-        services: {
-          type: "array",
-          items: { type: "string" },
-          description: "Services to include in report",
-        },
-        timeRange: {
-          type: "string",
-          description: "Time range for the report",
-        },
-      },
-      required: ["reportType"],
-    },
-  },
-  {
-    name: "list_incidents",
-    description: "List recent incidents. Use when user asks about incidents, issues, or problems.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        status: {
-          type: "string",
-          enum: ["all", "analyzing", "awaiting_approval", "resolved", "rejected"],
-          description: "Filter by status",
-        },
-        limit: {
-          type: "number",
-          description: "Number of incidents to return (default 10)",
-        },
+        required: ["query"],
       },
     },
   },
   {
-    name: "get_incident_details",
-    description: "Get details about a specific incident including findings and plan.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        incidentId: {
-          type: "string",
-          description: "The incident ID (e.g., INC-ABC123)",
+    type: "function",
+    function: {
+      name: "generate_report",
+      description: "Generate a summary report from Splunk data. Use when user asks for reports, summaries, or analysis.",
+      parameters: {
+        type: "object",
+        properties: {
+          reportType: {
+            type: "string",
+            enum: ["error_summary", "latency_report", "security_audit", "service_health"],
+            description: "Type of report to generate",
+          },
+          services: {
+            type: "array",
+            items: { type: "string" },
+            description: "Services to include in report",
+          },
+          timeRange: {
+            type: "string",
+            description: "Time range for the report",
+          },
         },
+        required: ["reportType"],
       },
-      required: ["incidentId"],
     },
   },
   {
-    name: "analyze_code",
-    description: "Fetch and analyze code from a GitHub repository. Use when user asks about code issues or wants to see code.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        service: {
-          type: "string",
-          description: "Service name that maps to a repository",
-        },
-        filePath: {
-          type: "string",
-          description: "Optional specific file path to analyze",
-        },
-        issueDescription: {
-          type: "string",
-          description: "Description of the issue to look for",
-        },
-      },
-      required: ["service"],
-    },
-  },
-  {
-    name: "create_code_fix",
-    description: "Generate a code fix and optionally create a PR. Use when user asks to fix code or create a PR.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        service: {
-          type: "string",
-          description: "Service name that maps to a repository",
-        },
-        filePath: {
-          type: "string",
-          description: "File path to fix",
-        },
-        issueDescription: {
-          type: "string",
-          description: "Description of what to fix",
-        },
-        createPR: {
-          type: "boolean",
-          description: "Whether to create a PR (default false, just show diff)",
-        },
-      },
-      required: ["service", "filePath", "issueDescription"],
-    },
-  },
-  {
-    name: "check_service_health",
-    description: "Check the health and status of services. Use when user asks about service status or health.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        services: {
-          type: "array",
-          items: { type: "string" },
-          description: "Services to check (empty for all)",
+    type: "function",
+    function: {
+      name: "list_incidents",
+      description: "List recent incidents. Use when user asks about incidents, issues, or problems.",
+      parameters: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            enum: ["all", "analyzing", "awaiting_approval", "resolved", "rejected"],
+            description: "Filter by status",
+          },
+          limit: {
+            type: "number",
+            description: "Number of incidents to return (default 10)",
+          },
         },
       },
     },
   },
   {
-    name: "get_blast_radius",
-    description: "Calculate blast radius for services. Use when user asks about impact or dependencies.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        services: {
-          type: "array",
-          items: { type: "string" },
-          description: "Services to analyze",
+    type: "function",
+    function: {
+      name: "get_incident_details",
+      description: "Get details about a specific incident including findings and plan.",
+      parameters: {
+        type: "object",
+        properties: {
+          incidentId: {
+            type: "string",
+            description: "The incident ID (e.g., INC-ABC123)",
+          },
         },
+        required: ["incidentId"],
       },
-      required: ["services"],
     },
   },
   {
-    name: "send_slack_notification",
-    description: "Send a message to Slack. Use when user asks to notify team or send alerts.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        message: {
-          type: "string",
-          description: "Message to send",
+    type: "function",
+    function: {
+      name: "analyze_code",
+      description: "Fetch and analyze code from a GitHub repository. Use when user asks about code issues or wants to see code.",
+      parameters: {
+        type: "object",
+        properties: {
+          service: {
+            type: "string",
+            description: "Service name that maps to a repository",
+          },
+          filePath: {
+            type: "string",
+            description: "Optional specific file path to analyze",
+          },
+          issueDescription: {
+            type: "string",
+            description: "Description of the issue to look for",
+          },
         },
-        severity: {
-          type: "string",
-          enum: ["info", "warning", "critical"],
-          description: "Severity level",
-        },
+        required: ["service"],
       },
-      required: ["message"],
     },
   },
   {
-    name: "query_past_incidents",
-    description: "Query historical incidents for patterns. Use when user asks about past issues or patterns.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        services: {
-          type: "array",
-          items: { type: "string" },
-          description: "Services to query history for",
+    type: "function",
+    function: {
+      name: "create_code_fix",
+      description: "Generate a code fix and optionally create a PR. Use when user asks to fix code or create a PR.",
+      parameters: {
+        type: "object",
+        properties: {
+          service: {
+            type: "string",
+            description: "Service name that maps to a repository",
+          },
+          filePath: {
+            type: "string",
+            description: "File path to fix",
+          },
+          issueDescription: {
+            type: "string",
+            description: "Description of what to fix",
+          },
+          createPR: {
+            type: "boolean",
+            description: "Whether to create a PR (default false, just show diff)",
+          },
         },
-        limit: {
-          type: "number",
-          description: "Number of past incidents to retrieve",
+        required: ["service", "filePath", "issueDescription"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "check_service_health",
+      description: "Check the health and status of services. Use when user asks about service status or health.",
+      parameters: {
+        type: "object",
+        properties: {
+          services: {
+            type: "array",
+            items: { type: "string" },
+            description: "Services to check (empty for all)",
+          },
         },
       },
-      required: ["services"],
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_blast_radius",
+      description: "Calculate blast radius for services. Use when user asks about impact or dependencies.",
+      parameters: {
+        type: "object",
+        properties: {
+          services: {
+            type: "array",
+            items: { type: "string" },
+            description: "Services to analyze",
+          },
+        },
+        required: ["services"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "send_slack_notification",
+      description: "Send a message to Slack. Use when user asks to notify team or send alerts.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description: "Message to send",
+          },
+          severity: {
+            type: "string",
+            enum: ["info", "warning", "critical"],
+            description: "Severity level",
+          },
+        },
+        required: ["message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "query_past_incidents",
+      description: "Query historical incidents for patterns. Use when user asks about past issues or patterns.",
+      parameters: {
+        type: "object",
+        properties: {
+          services: {
+            type: "array",
+            items: { type: "string" },
+            description: "Services to query history for",
+          },
+          limit: {
+            type: "number",
+            description: "Number of past incidents to retrieve",
+          },
+        },
+        required: ["services"],
+      },
     },
   },
 ];
@@ -273,10 +303,13 @@ export async function processChat(
   const { userId, conversationHistory } = context;
 
   // Build messages from history
-  const messages: Anthropic.MessageParam[] = conversationHistory.map((msg) => ({
-    role: msg.role,
-    content: msg.content,
-  }));
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: SYSTEM_PROMPT },
+    ...conversationHistory.map((msg) => ({
+      role: msg.role as "user" | "assistant",
+      content: msg.content,
+    })),
+  ];
 
   // Add current message
   messages.push({ role: "user", content: message });
@@ -285,50 +318,43 @@ export async function processChat(
   let continueLoop = true;
 
   while (continueLoop) {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const response = await openai.chat.completions.create({
+      model: config.openai.model,
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
       tools: TOOLS,
       messages,
     });
 
+    const choice = response.choices[0];
+    const responseMessage = choice?.message;
+
     // Process response content
-    for (const block of response.content) {
-      if (block.type === "text") {
-        fullResponse += block.text;
-        onStream?.(block.text);
-      } else if (block.type === "tool_use") {
-        onToolUse?.(block.name, block.input);
+    if (responseMessage?.content) {
+      fullResponse += responseMessage.content;
+      onStream?.(responseMessage.content);
+    }
+
+    if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+      // Add assistant message with tool calls
+      messages.push(responseMessage);
+
+      // Execute each tool call
+      for (const toolCall of responseMessage.tool_calls) {
+        const toolName = toolCall.function.name;
+        const toolInput = JSON.parse(toolCall.function.arguments);
+
+        onToolUse?.(toolName, toolInput);
 
         // Execute the tool
-        const toolResult = await executeTool(block.name, block.input as Record<string, unknown>, userId);
-
-        // Add assistant message with tool use
-        messages.push({
-          role: "assistant",
-          content: response.content,
-        });
+        const toolResult = await executeTool(toolName, toolInput, userId);
 
         // Add tool result
         messages.push({
-          role: "user",
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: block.id,
-              content: JSON.stringify(toolResult, null, 2),
-            },
-          ],
+          role: "tool",
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(toolResult, null, 2),
         });
       }
-    }
-
-    // Check if we need to continue (more tool calls)
-    if (response.stop_reason === "end_turn") {
-      continueLoop = false;
-    } else if (response.stop_reason === "tool_use") {
-      // Continue to process tool results
       continueLoop = true;
     } else {
       continueLoop = false;
@@ -622,9 +648,9 @@ async function executeCreateCodeFix(
     // Get file content
     const file = await github.getFileContent(mapping.repoOwner, mapping.repoName, filePath);
 
-    // Generate fix using Claude
-    const fixResponse = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+    // Generate fix using OpenAI
+    const fixResponse = await openai.chat.completions.create({
+      model: config.openai.model,
       max_tokens: 4096,
       messages: [
         {
@@ -649,12 +675,12 @@ Return a JSON object with:
       ],
     });
 
-    const fixContent = fixResponse.content[0];
-    if (fixContent.type !== "text") {
+    const fixContent = fixResponse.choices[0]?.message?.content;
+    if (!fixContent) {
       return { error: "Failed to generate fix" };
     }
 
-    const jsonMatch = fixContent.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = fixContent.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return { error: "Failed to parse fix" };
     }

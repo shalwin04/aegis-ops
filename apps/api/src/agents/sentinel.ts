@@ -1,4 +1,4 @@
-import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import type { SentinelFindings } from "@aegis/shared";
 import { config } from "../config.js";
 import { getEventEmitter } from "../graph/workflow.js";
@@ -31,12 +31,12 @@ Always provide:
 
 Analyze the incident and respond with a JSON object matching the SentinelFindings schema.`;
 
-let _model: ChatAnthropic | null = null;
-function getModel(): ChatAnthropic {
+let _model: ChatOpenAI | null = null;
+function getModel(): ChatOpenAI {
   if (!_model) {
-    _model = new ChatAnthropic({
-      apiKey: config.anthropic.apiKey,
-      model: config.anthropic.model,
+    _model = new ChatOpenAI({
+      openAIApiKey: config.openai.apiKey,
+      modelName: config.openai.model,
     });
   }
   return _model;

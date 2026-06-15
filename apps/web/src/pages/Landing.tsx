@@ -65,19 +65,25 @@ const capabilities = [
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-x-hidden overflow-y-auto">
       {/* Background effects */}
-      <div className="fixed inset-0 bg-grid pointer-events-none" />
-      <div className="fixed inset-0 bg-radial pointer-events-none" />
-      <div className="fixed inset-0 bg-radial-bottom pointer-events-none" />
+      <div className="fixed inset-0 bg-grid pointer-events-none z-0" />
+      <div className="fixed inset-0 bg-radial pointer-events-none z-0" />
+      <div className="fixed inset-0 bg-radial-bottom pointer-events-none z-0" />
 
-      {/* Floating orbs */}
-      <div className="orb w-[800px] h-[800px] -top-60 -left-60" />
-      <div className="orb-accent w-[600px] h-[600px] top-1/3 -right-40" />
-      <div className="orb w-[500px] h-[500px] bottom-0 left-1/4" />
+      {/* Floating orbs - contained within viewport */}
+      <div className="fixed top-0 left-0 w-[600px] h-[600px] opacity-30 pointer-events-none z-0">
+        <div className="orb w-full h-full -translate-x-1/2 -translate-y-1/2" />
+      </div>
+      <div className="fixed top-1/3 right-0 w-[500px] h-[500px] opacity-30 pointer-events-none z-0">
+        <div className="orb-accent w-full h-full translate-x-1/2" />
+      </div>
+      <div className="fixed bottom-0 left-1/4 w-[400px] h-[400px] opacity-20 pointer-events-none z-0">
+        <div className="orb w-full h-full" />
+      </div>
 
       {/* Noise texture */}
-      <div className="fixed inset-0 noise pointer-events-none" />
+      <div className="fixed inset-0 noise pointer-events-none z-0" />
 
       {/* Navigation */}
       <motion.nav
@@ -124,7 +130,7 @@ export default function Landing() {
       </motion.nav>
 
       {/* Hero Section */}
-      <section className="relative pt-40 pb-20 px-6">
+      <section className="relative pt-40 pb-20 px-6 z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -179,9 +185,9 @@ export default function Landing() {
             initial={{ opacity: 0, y: 60 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.5 }}
-            className="mt-20 relative"
+            className="mt-20 relative max-w-5xl mx-auto"
           >
-            <div className="glass-strong rounded-3xl p-2 max-w-5xl mx-auto">
+            <div className="glass-strong rounded-3xl p-2 relative">
               <div className="rounded-2xl bg-background/80 overflow-hidden border border-border/50">
                 {/* Mock Dashboard Preview */}
                 <div className="p-6 space-y-6">
@@ -247,44 +253,12 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* Floating elements */}
-            <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -left-8 top-1/4 glass rounded-2xl p-4 hidden lg:block"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
-                  <Shield className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Threat Blocked</p>
-                  <p className="text-xs text-muted-foreground">12,453 requests</p>
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute -right-8 top-1/3 glass rounded-2xl p-4 hidden lg:block"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-foreground/10 flex items-center justify-center">
-                  <Activity className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">MTTR Reduced</p>
-                  <p className="text-xs text-muted-foreground">85% faster</p>
-                </div>
-              </div>
-            </motion.div>
           </motion.div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="py-32 px-6 relative">
+      <section id="features" className="py-32 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -323,7 +297,7 @@ export default function Landing() {
       </section>
 
       {/* How it Works */}
-      <section id="how-it-works" className="py-32 px-6 relative">
+      <section id="how-it-works" className="py-32 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -407,7 +381,7 @@ export default function Landing() {
       </section>
 
       {/* Capabilities Grid */}
-      <section className="py-32 px-6 relative">
+      <section className="py-32 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -447,7 +421,7 @@ export default function Landing() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-32 px-6 relative">
+      <section className="py-32 px-6 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}

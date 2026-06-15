@@ -12,10 +12,10 @@ const configSchema = z.object({
     index: z.string().default("aegis"),
   }),
 
-  // Anthropic
-  anthropic: z.object({
+  // OpenAI
+  openai: z.object({
     apiKey: z.string(),
-    model: z.string().default("claude-sonnet-4-20250514"),
+    model: z.string().default("gpt-4o"),
   }),
 
   // Server
@@ -42,9 +42,9 @@ function loadConfig(): Config {
       token: process.env.SPLUNK_TOKEN,
       index: process.env.SPLUNK_INDEX || "aegis",
     },
-    anthropic: {
-      apiKey: process.env.ANTHROPIC_API_KEY || "",
-      model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
+    openai: {
+      apiKey: process.env.OPENAI_API_KEY || "",
+      model: process.env.OPENAI_MODEL || "gpt-4o",
     },
     server: {
       port: parseInt(process.env.API_PORT || "3001", 10),

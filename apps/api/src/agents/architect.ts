@@ -3,7 +3,7 @@ import type {
   Action,
   CodePatchAction,
 } from "@aegis/shared";
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { getEventEmitter } from "../graph/workflow.js";
 import { getMCPProviderForUser } from "../mcp/index.js";
 import type { AegisGraphState } from "../graph/state.js";
@@ -15,8 +15,8 @@ import { config } from "../config.js";
 import { queryMemoryForServices, type MemoryContext } from "../utils/memory.js";
 import { calculateBlastRadius, inferDependenciesFromHistory, type BlastRadiusResult } from "../utils/blastRadius.js";
 
-const anthropic = new Anthropic({
-  apiKey: config.anthropic.apiKey,
+const openai = new OpenAI({
+  apiKey: config.openai.apiKey,
 });
 
 /**
@@ -138,17 +138,17 @@ Respond with a JSON object (no markdown, just raw JSON):
 }`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const response = await openai.chat.completions.create({
+      model: config.openai.model,
       max_tokens: 4096,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const content = response.content[0];
-    if (content.type !== "text") return null;
+    const content = response.choices[0]?.message?.content;
+    if (!content) return null;
 
     // Parse the JSON response
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const result = JSON.parse(jsonMatch[0]);
